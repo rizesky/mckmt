@@ -1,0 +1,17 @@
+apiVersion: v2
+name: mckmt
+description: Multi-Cluster Kubernetes Management Agent
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - kubernetes
+  - multi-cluster
+  - management
+  - agent
+home: https://github.com/rizesky/mckmt
+sources:
+  - https://github.com/rizesky/mckmt
+maintainers:
+  - name: MCKMT Team
+    email: team@mckmt.dev

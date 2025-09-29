@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mckmt-agent
+  labels:
+    app: mckmt-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mckmt-agent
+  template:
+    metadata:
+      labels:
+        app: mckmt-agent
+    spec:
+      serviceAccountName: mckmt-agent
+      containers:
+      - name: agent
+        image: mckmt/agent:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: MCKMT_HUB_HOST
+          value: "mckmt-hub"
+        - name: MCKMT_HUB_PORT
+          value: "8081"
+        - name: MCKMT_AGENT_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: MCKMT_AGENT_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5

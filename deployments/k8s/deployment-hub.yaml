@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mckmt-hub
+  labels:
+    app: mckmt-hub
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mckmt-hub
+  template:
+    metadata:
+      labels:
+        app: mckmt-hub
+    spec:
+      containers:
+      - name: hub
+        image: mckmt/hub:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 8081
+          name: grpc
+        env:
+        - name: MCKMT_DATABASE_HOST
+          value: "postgres"
+        - name: MCKMT_DATABASE_PORT
+          value: "5432"
+        - name: MCKMT_DATABASE_USER
+          value: "mckmt"
+        - name: MCKMT_DATABASE_PASSWORD
+          value: "mckmt"
+        - name: MCKMT_DATABASE_NAME
+          value: "mckmt"
+        - name: MCKMT_REDIS_HOST
+          value: "redis"
+        - name: MCKMT_REDIS_PORT
+          value: "6379"
+        - name: MCKMT_REDIS_PASSWORD
+          value: ""
+        - name: MCKMT_SERVER_HOST
+          value: "0.0.0.0"
+        - name: MCKMT_SERVER_PORT
+          value: "8080"
+        - name: MCKMT_GRPC_HOST
+          value: "0.0.0.0"
+        - name: MCKMT_GRPC_PORT
+          value: "8081"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5

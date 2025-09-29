@@ -1,0 +1,155 @@
+syntax = "proto3";
+
+package mckma.agent.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
+
+option go_package = "github.com/rizesky/mckma/api/proto/agent/v1;agentv1";
+
+// Agent service handles communication between hub and cluster agents
+service AgentService {
+  // Register agent with the hub
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  
+  // Send heartbeat to hub
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  
+  // Stream operations from hub
+  rpc StreamOperations(StreamOperationsRequest) returns (stream Operation);
+  
+  // Report operation result
+  rpc ReportResult(ReportResultRequest) returns (ReportResultResponse);
+  
+  // Stream logs to hub
+  rpc StreamLogs(stream LogEntry) returns (LogStreamResponse);
+  
+  // Stream metrics to hub
+  rpc StreamMetrics(stream MetricEntry) returns (MetricStreamResponse);
+  
+  // Cancel operation
+  rpc CancelOperation(CancelOperationRequest) returns (CancelOperationResponse);
+}
+
+// RegisterRequest is sent when agent first connects
+message RegisterRequest {
+  string cluster_name = 1; // Human-readable cluster name/identifier
+  string agent_version = 2;
+  string fingerprint = 3;
+  ClusterInfo cluster_info = 4;
+}
+
+// RegisterResponse is the response to registration
+message RegisterResponse {
+  bool success = 1;
+  string message = 2;
+  string cluster_id = 3; // Hub-assigned cluster ID
+  string session_token = 4;
+  int64 heartbeat_interval = 5; // in seconds
+}
+
+// HeartbeatRequest is sent periodically
+message HeartbeatRequest {
+  string cluster_id = 1;
+  string session_token = 2;
+  ClusterStatus status = 3;
+}
+
+// HeartbeatResponse confirms heartbeat
+message HeartbeatResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// StreamOperationsRequest requests operation stream
+message StreamOperationsRequest {
+  string cluster_id = 1;
+  string session_token = 2;
+}
+
+// Operation represents a task to be executed
+message Operation {
+  string id = 1;
+  string cluster_id = 2;
+  string type = 3;
+  google.protobuf.Any payload = 4;
+  google.protobuf.Timestamp created_at = 5;
+  int32 timeout_seconds = 6;
+}
+
+// ReportResultRequest reports operation completion
+message ReportResultRequest {
+  string operation_id = 1;
+  string cluster_id = 2;
+  bool success = 3;
+  string message = 4;
+  google.protobuf.Any result = 5;
+  google.protobuf.Timestamp completed_at = 6;
+}
+
+// ReportResultResponse confirms result reporting
+message ReportResultResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// LogEntry represents a log entry
+message LogEntry {
+  string level = 1;
+  string message = 2;
+  string source = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  map<string, string> fields = 5;
+}
+
+// LogStreamResponse confirms log receipt
+message LogStreamResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// MetricEntry represents a metric entry
+message MetricEntry {
+  string name = 1;
+  double value = 2;
+  map<string, string> labels = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+// MetricStreamResponse confirms metric receipt
+message MetricStreamResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// ClusterInfo contains information about the cluster
+message ClusterInfo {
+  string kubernetes_version = 1;
+  string platform = 2;
+  int32 node_count = 3;
+  string region = 4;
+  map<string, string> labels = 5;
+}
+
+// ClusterStatus represents the current status of the cluster
+message ClusterStatus {
+  string status = 1; // "healthy", "degraded", "unhealthy"
+  int32 ready_nodes = 2;
+  int32 total_nodes = 3;
+  repeated string issues = 4;
+  google.protobuf.Timestamp last_check = 5;
+}
+
+// CancelOperationRequest requests operation cancellation
+message CancelOperationRequest {
+  string operation_id = 1;
+  string cluster_id = 2;
+  string session_token = 3;
+  string reason = 4;
+}
+
+// CancelOperationResponse confirms operation cancellation
+message CancelOperationResponse {
+  bool success = 1;
+  string message = 2;
+}

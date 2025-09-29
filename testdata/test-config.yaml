@@ -1,0 +1,32 @@
+# Test configuration
+server:
+  host: "localhost"
+  port: 8080
+  grpc_port: 8081
+
+database:
+  host: "localhost"
+  port: 5432
+  name: "mckmt_test"
+  user: "mckmt"
+  password: "mckmt"
+  ssl_mode: "disable"
+  max_connections: 10
+
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+
+auth:
+  jwt:
+    secret: "test-secret-key"
+    expiration: "24h"
+
+orchestrator:
+  workers: 2
+
+log:
+  level: "debug"
+  format: "json"
