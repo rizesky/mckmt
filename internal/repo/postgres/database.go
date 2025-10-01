@@ -8,6 +8,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
+
+	"github.com/rizesky/mckmt/internal/utils"
 )
 
 // Database represents the database connection and repositories
@@ -85,7 +87,7 @@ func (db *Database) Transaction(ctx context.Context, fn func(tx pgx.Tx) error) e
 
 // Health checks the database health
 func (db *Database) Health(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctx, cancel := utils.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	if err := db.pool.Ping(ctx); err != nil {

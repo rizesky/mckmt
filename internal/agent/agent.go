@@ -13,18 +13,20 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
+	agentv1 "github.com/rizesky/mckmt/api/proto/agent/v1"
 	"github.com/rizesky/mckmt/internal/config"
 	"github.com/rizesky/mckmt/internal/kube"
 )
 
 // Agent represents a cluster agent
 type Agent struct {
-	config       *config.Config
+	config       *config.AgentConfig
 	kubeClient   *kube.Client
 	logger       *zap.Logger
 	conn         *grpc.ClientConn
-	client       AgentServiceClient
+	client       agentv1.AgentServiceClient
 	clusterID    string
 	sessionToken string
 	stopCh       chan struct{}
@@ -32,7 +34,7 @@ type Agent struct {
 }
 
 // NewAgent creates a new cluster agent
-func NewAgent(cfg *config.Config, kubeClient *kube.Client, logger *zap.Logger) *Agent {
+func NewAgent(cfg *config.AgentConfig, kubeClient *kube.Client, logger *zap.Logger) *Agent {
 	return &Agent{
 		config:     cfg,
 		kubeClient: kubeClient,
@@ -67,6 +69,8 @@ func (a *Agent) Start(ctx context.Context) error {
 	// Start operation stream
 	go a.streamOperations(ctx)
 
+	a.logger.Info("Agent started successfully")
+
 	// Start log streaming
 	go a.streamLogs(ctx)
 
@@ -83,7 +87,9 @@ func (a *Agent) Stop() {
 	close(a.stopCh)
 
 	if a.conn != nil {
-		a.conn.Close()
+		if err := a.conn.Close(); err != nil {
+			a.logger.Warn("failed to close connection", zap.Error(err))
+		}
 	}
 }
 
@@ -105,13 +111,13 @@ func (a *Agent) connect(ctx context.Context) error {
 	}
 
 	// Connect to hub
-	conn, err := grpc.DialContext(ctx, a.config.Agent.HubURL, opts...)
+	conn, err := grpc.DialContext(ctx, a.config.HubURL, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to dial hub: %w", err)
 	}
 
 	a.conn = conn
-	a.client = NewAgentServiceClient(conn)
+	a.client = agentv1.NewAgentServiceClient(conn)
 	return nil
 }
 
@@ -127,11 +133,11 @@ func (a *Agent) register(ctx context.Context) error {
 	clusterName := a.getClusterName()
 
 	// Create registration request with cluster name
-	req := &RegisterRequest{
+	req := &agentv1.RegisterRequest{
 		ClusterName:  clusterName,
 		AgentVersion: "1.0.0",
 		Fingerprint:  "agent-fingerprint", // TODO: Generate proper fingerprint
-		ClusterInfo: &ClusterInfo{
+		ClusterInfo: &agentv1.ClusterInfo{
 			KubernetesVersion: clusterInfo.KubernetesVersion,
 			Platform:          clusterInfo.Platform,
 			NodeCount:         int32(clusterInfo.NodeCount),
@@ -165,7 +171,19 @@ func (a *Agent) register(ctx context.Context) error {
 
 // heartbeat sends periodic heartbeats to the hub
 func (a *Agent) heartbeat(ctx context.Context) {
-	ticker := time.NewTicker(time.Duration(a.config.Agent.Heartbeat))
+	a.logger.Debug("Starting heartbeat",
+		zap.Duration("heartbeat_interval", a.config.HeartbeatInterval),
+		zap.String("hub_url", a.config.HubURL))
+
+	// Use a default heartbeat if not configured
+	heartbeatInterval := a.config.HeartbeatInterval
+	if heartbeatInterval <= 0 {
+		heartbeatInterval = 30 * time.Second
+		a.logger.Warn("Heartbeat interval not configured, using default",
+			zap.Duration("default_interval", heartbeatInterval))
+	}
+
+	ticker := time.NewTicker(heartbeatInterval)
 	defer ticker.Stop()
 
 	for {
@@ -190,7 +208,7 @@ func (a *Agent) sendHeartbeat(ctx context.Context) error {
 		return fmt.Errorf("failed to get cluster status: %w", err)
 	}
 
-	req := &HeartbeatRequest{
+	req := &agentv1.HeartbeatRequest{
 		ClusterId:    a.clusterID,
 		SessionToken: a.sessionToken,
 		Status:       status,
@@ -209,12 +227,12 @@ func (a *Agent) sendHeartbeat(ctx context.Context) error {
 }
 
 // getClusterStatus gets the current cluster status
-func (a *Agent) getClusterStatus(ctx context.Context) (*ClusterStatus, error) {
+func (a *Agent) getClusterStatus(ctx context.Context) (*agentv1.ClusterStatus, error) {
 	// Check cluster health
 	if err := a.kubeClient.HealthCheck(ctx); err != nil {
-		return &ClusterStatus{
+		return &agentv1.ClusterStatus{
 			Status:    "unhealthy",
-			LastCheck: time.Now(),
+			LastCheck: timestamppb.New(time.Now()),
 			Issues:    []string{err.Error()},
 		}, nil
 	}
@@ -222,9 +240,9 @@ func (a *Agent) getClusterStatus(ctx context.Context) (*ClusterStatus, error) {
 	// Get cluster info for node counts
 	info, err := a.kubeClient.GetClusterInfo(ctx)
 	if err != nil {
-		return &ClusterStatus{
+		return &agentv1.ClusterStatus{
 			Status:    "degraded",
-			LastCheck: time.Now(),
+			LastCheck: timestamppb.New(time.Now()),
 			Issues:    []string{fmt.Sprintf("failed to get cluster info: %v", err)},
 		}, nil
 	}
@@ -234,17 +252,19 @@ func (a *Agent) getClusterStatus(ctx context.Context) (*ClusterStatus, error) {
 		status = "degraded"
 	}
 
-	return &ClusterStatus{
+	return &agentv1.ClusterStatus{
 		Status:     status,
 		ReadyNodes: int32(info.ReadyNodes),
 		TotalNodes: int32(info.NodeCount),
-		LastCheck:  time.Now(),
+		LastCheck:  timestamppb.New(time.Now()),
 	}, nil
 }
 
 // streamOperations streams operations from the hub
 func (a *Agent) streamOperations(ctx context.Context) {
-	req := &StreamOperationsRequest{
+	a.logger.Debug("Starting operation stream")
+
+	req := &agentv1.StreamOperationsRequest{
 		ClusterId:    a.clusterID,
 		SessionToken: a.sessionToken,
 	}
@@ -254,6 +274,8 @@ func (a *Agent) streamOperations(ctx context.Context) {
 		a.logger.Error("Failed to start operation stream", zap.Error(err))
 		return
 	}
+
+	a.logger.Debug("Operation stream started successfully")
 
 	for {
 		select {
@@ -273,14 +295,22 @@ func (a *Agent) streamOperations(ctx context.Context) {
 				continue
 			}
 
-			// Process operation in a goroutine
-			go a.processOperation(ctx, operation)
+			// Only process operation if we successfully received one
+			if operation != nil {
+				// Process operation in a goroutine
+				go a.processOperation(ctx, operation)
+			}
 		}
 	}
 }
 
 // processOperation processes a single operation
-func (a *Agent) processOperation(ctx context.Context, operation *Operation) {
+func (a *Agent) processOperation(ctx context.Context, operation *agentv1.Operation) {
+	if operation == nil {
+		a.logger.Error("Received nil operation, skipping")
+		return
+	}
+
 	a.logger.Info("Processing operation",
 		zap.String("operation_id", operation.Id),
 		zap.String("type", operation.Type),
@@ -346,34 +376,34 @@ func (a *Agent) processOperation(ctx context.Context, operation *Operation) {
 }
 
 // processApplyOperation processes an apply operation
-func (a *Agent) processApplyOperation(ctx context.Context, operation *Operation) (*anypb.Any, bool, string) {
+func (a *Agent) processApplyOperation(ctx context.Context, operation *agentv1.Operation) (*anypb.Any, bool, string) {
 	// TODO: Extract manifest from operation payload
 	// TODO: Apply manifest using kubeClient
 	return nil, false, "not implemented"
 }
 
 // processExecOperation processes an exec operation
-func (a *Agent) processExecOperation(ctx context.Context, operation *Operation) (*anypb.Any, bool, string) {
+func (a *Agent) processExecOperation(ctx context.Context, operation *agentv1.Operation) (*anypb.Any, bool, string) {
 	// TODO: Extract command from operation payload
 	// TODO: Execute command using kubeClient
 	return nil, false, "not implemented"
 }
 
 // processSyncOperation processes a sync operation
-func (a *Agent) processSyncOperation(ctx context.Context, operation *Operation) (*anypb.Any, bool, string) {
+func (a *Agent) processSyncOperation(ctx context.Context, operation *agentv1.Operation) (*anypb.Any, bool, string) {
 	// TODO: Sync cluster resources
 	return nil, false, "not implemented"
 }
 
 // reportResult reports the result of an operation
 func (a *Agent) reportResult(ctx context.Context, operationID string, success bool, message string, result *anypb.Any) error {
-	req := &ReportResultRequest{
+	req := &agentv1.ReportResultRequest{
 		OperationId: operationID,
 		ClusterId:   a.clusterID,
 		Success:     success,
 		Message:     message,
 		Result:      result,
-		CompletedAt: time.Now(),
+		CompletedAt: timestamppb.New(time.Now()),
 	}
 
 	resp, err := a.client.ReportResult(ctx, req)

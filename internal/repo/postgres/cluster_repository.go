@@ -70,7 +70,7 @@ func (r *clusterRepository) List(ctx context.Context, limit, offset int) ([]*rep
 	}
 	defer rows.Close()
 
-	var clusters []*repo.Cluster
+	clusters := make([]*repo.Cluster, 0)
 	for rows.Next() {
 		cluster := &repo.Cluster{}
 		err := rows.Scan(
@@ -105,12 +105,12 @@ func (r *clusterRepository) Delete(ctx context.Context, id uuid.UUID) error {
 
 func (r *clusterRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status string) error {
 	query := `UPDATE clusters SET status = $2, updated_at = $3 WHERE id = $1`
-	_, err := r.db.pool.Exec(ctx, query, id, status, time.Now())
+	_, err := r.db.pool.Exec(ctx, query, id, status, time.Now().UTC())
 	return err
 }
 
 func (r *clusterRepository) UpdateLastSeen(ctx context.Context, id uuid.UUID) error {
 	query := `UPDATE clusters SET last_seen_at = $2, updated_at = $3 WHERE id = $1`
-	_, err := r.db.pool.Exec(ctx, query, id, time.Now(), time.Now())
+	_, err := r.db.pool.Exec(ctx, query, id, time.Now().UTC(), time.Now().UTC())
 	return err
 }

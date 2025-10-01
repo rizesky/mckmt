@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/rizesky/mckmt/internal/config"
 	"github.com/rizesky/mckmt/internal/repo"
 	"go.uber.org/zap"
 )
@@ -515,6 +516,17 @@ func (m *MockOrchestrator) QueueOperation(operation *repo.Operation) error {
 
 // NewTestLogger creates a test logger
 func NewTestLogger() *zap.Logger {
-	logger, _ := zap.NewDevelopment()
+	cfg := config.LoggingConfig{
+		Level:      "info",
+		Format:     "console",
+		Caller:     false,
+		Stacktrace: false,
+	}
+
+	logger, err := config.InitLogger(cfg)
+	if err != nil {
+		// Fallback to basic logger if config fails
+		logger, _ = zap.NewDevelopment()
+	}
 	return logger
 }

@@ -15,33 +15,72 @@ Comprehensive toolkit for managing multiple Kubernetes clusters from a central c
 
 **However, it is actually usable** and can serve as a solid foundation for a real multi-cluster management system with proper testing, security review, and production hardening.
 
+## Table of Contents
+
+- [Features](#features)
+  - [Implemented](#-implemented)
+  - [In Progress / Partial](#-in-progress--partial)
+  - [Planned](#-planned)
+- [Quick Start](#quick-start)
+  - [Prerequisites](#prerequisites)
+  - [Examples & Demos](#examples--demos)
+  - [Quick Kind Demo (Recommended)](#quick-kind-demo-recommended)
+  - [Using Docker Compose](#using-docker-compose)
+- [Development Commands](#development-commands)
+  - [Script Integration](#script-integration)
+- [Demo Environment Options](#demo-environment-options)
+  - [Option 1: Docker Demo (Recommended)](#option-1-docker-demo-recommended)
+  - [Option 2: Local Development](#option-2-local-development)
+- [API Documentation](#api-documentation)
+- [Configuration](#configuration)
+  - [Configuration Sources (Priority Order)](#configuration-sources-priority-order)
+  - [Configuration File](#configuration-file)
+  - [Custom Configuration Files](#custom-configuration-files)
+  - [Environment Variables](#environment-variables)
+  - [Configuration Mapping](#configuration-mapping)
+- [Database Migrations](#database-migrations)
+  - [Migration Commands](#migration-commands)
+  - [Creating New Migrations](#creating-new-migrations)
+  - [Migration Best Practices](#migration-best-practices)
+- [Development](#development)
+  - [Project Structure](#project-structure)
+  - [Building](#building)
+  - [Database Setup](#database-setup)
+  - [Running Tests](#running-tests)
+  - [Code Generation](#code-generation)
+- [Contributing](#contributing)
+- [License](#license)
+
 ## Features
 
 ### ✅ Implemented
 - **Agent-Based Architecture**: Secure agent-based communication only
-- **RESTful API**: Basic REST API with OpenAPI documentation
-- **Authentication**: JWT-based authentication middleware
+- **RESTful API**: Complete REST API with OpenAPI documentation
+- **Authentication**: JWT-based authentication with OIDC and password support
+- **Authorization**: Comprehensive RBAC/ABAC with Casbin integration
 - **Database Schema**: Complete PostgreSQL schema with migrations
 - **gRPC Communication**: Agent registration, heartbeat, and operation cancellation
-- **Configuration Management**: YAML-based config with environment variable support
+- **Configuration Management**: YAML-based config with environment variable support and custom config file support
 - **Docker Support**: Complete Docker Compose setup for development
-- **Metrics Collection**: Prometheus metrics for monitoring
+- **Metrics Collection**: Optional Prometheus metrics for monitoring
 - **Health Checks**: Basic health and metrics endpoints
+- **Audit Logging**: Comprehensive audit trails for operations
+- **Kind Integration**: Complete Kind cluster management with Kustomize
+- **Comprehensive Examples**: Step-by-step tutorials and demos (see [Examples Documentation](docs/EXAMPLES.md))
 
 ### 🚧 In Progress / Partial
 - **Cluster Management**: Basic CRUD operations (list, get, update, delete)
 - **Operation Management**: Basic operation tracking and cancellation
 - **Agent Processing**: Basic agent registration and heartbeat
-
-### ❌ Not Yet Implemented
-- **Multi-Cluster Management**: Full cluster resource management
-- **RBAC Authorization**: Role-based access control policies
-- **Audit Logging**: Comprehensive audit trails for operations
-- **Web UI Dashboard**: User interface for cluster management
 - **Manifest Application**: Deploy Kubernetes manifests to clusters
 - **Resource Listing**: List and manage cluster resources
+
+### ❌ Not Yet Implemented
+- **Web UI Dashboard**: User interface for cluster management
 - **WebSocket Support**: Real-time updates and notifications
 - **Terraform Provider**: Infrastructure as code integration
+- **Advanced Monitoring**: Custom dashboards and alerting
+- **Multi-Tenant Support**: Isolated environments per tenant
 
 ## Architecture
 
@@ -479,25 +518,28 @@ spec:
 
 For comprehensive examples and step-by-step tutorials, see our [Examples Documentation](docs/EXAMPLES.md):
 
-- **Minikube Demo**: Complete setup with automated script
-- **Kind Clusters**: Multi-cluster management examples
+- **Kind Clusters**: Complete setup with automated script (recommended)
+- **Minikube Demo**: Alternative setup for development
 - **Production Deployment**: Real-world configuration examples
 - **API Usage**: Detailed API integration examples
 - **Troubleshooting**: Common issues and solutions
 
-#### Quick Minikube Demo
+#### Quick Kind Demo (Recommended)
 
 ```bash
-# Run the automated minikube demo
-./scripts/minikube-demo.sh
+# Run the automated Kind demo with OIDC
+make demo-oidc
+
+# Or run with password authentication only
+make demo-password
 
 # This will:
-# 1. Start minikube with sufficient resources
-# 2. Build MCKMT binaries
-# 3. Start dependencies (PostgreSQL, Redis)
-# 4. Start the Hub API server
-# 5. Register the cluster
-# 6. Deploy the agent
+# 1. Start Kind clusters with sufficient resources
+# 2. Start dependencies (PostgreSQL, Redis)
+# 3. Start monitoring stack (Prometheus, Grafana)
+# 4. Start OIDC provider (Keycloak) - for OIDC demo only
+# 5. Start Hub API server with appropriate configuration
+# 6. Deploy agents to Kind clusters
 # 7. Provide access URLs and next steps
 ```
 
@@ -555,6 +597,91 @@ export MCKMT_JWT_SECRET=your-super-secret-jwt-key
 go run cmd/hub/main.go
 ```
 
+### Development Commands
+
+The project includes several make commands for development:
+
+```bash
+# Start development environment
+make dev
+
+# Start only core dependencies (PostgreSQL, Redis)
+make deps
+
+# Start monitoring stack (Prometheus, Grafana)
+make deps-monitoring
+
+# Start OIDC provider (Keycloak)
+make deps-oidc
+
+# Stop development environment (keeps data)
+make teardown
+
+# Stop development environment and remove all data
+make teardown-all
+```
+
+#### Script Integration
+
+All helper scripts are integrated with make commands:
+
+```bash
+# Kind cluster management
+make kind-create COUNT=3    # Create Kind clusters with agents
+make kind-stop             # Stop all Kind clusters
+make kind-status           # Show cluster and agent status
+make kind-list             # List all Kind clusters
+
+# Dashboard and OIDC setup
+make dashboard             # Open monitoring dashboard
+make setup-keycloak        # Configure Keycloak for OIDC
+
+# Kustomize testing
+make test-kustomize        # Test all Kustomize configurations
+make test-kustomize-demo   # Test demo configuration
+make test-kustomize-production # Test production configuration
+
+# Quick aliases
+make clusters              # Alias for kind-list
+make agents                # Alias for kind-status
+```
+
+### Demo Environment Options
+
+#### Option 1: Docker Demo (Recommended)
+
+For a complete demo with OIDC authentication:
+```bash
+# Start OIDC demo (includes Keycloak)
+make demo-oidc
+
+# Or start password-only demo
+make demo-password
+```
+
+#### Option 2: Local Development
+
+For local development with custom configuration:
+```bash
+# Start dependencies
+make deps
+
+# Start Hub with custom config
+MCKMT_CONFIG_FILE=configs/demo/hub-oidc.yaml go run cmd/hub/main.go
+
+# Start Agent with custom config  
+MCKMT_CONFIG_FILE=configs/demo/agent-demo.yaml go run cmd/agent/main.go
+```
+
+#### Access Services:
+- **Hub API**: http://localhost:8080
+- **Keycloak**: http://localhost:8082 (OIDC demo only)
+- **Keycloak Admin**: http://localhost:8082/admin (admin/admin123)
+- **Prometheus**: http://localhost:9090
+- **Grafana**: http://localhost:3000 (admin/admin)
+
+See [OIDC Setup Guide](docs/OIDC_SETUP.md) for detailed configuration.
+
 ## API Documentation
 
 ### Interactive API Documentation
@@ -586,38 +713,40 @@ The MCKMT Hub API provides the following main endpoints:
 - `GET /api/v1/metrics` - Prometheus metrics
 
 #### **Authentication**
-- `POST /api/v1/auth/login` - User login
-- `POST /api/v1/auth/refresh` - Refresh JWT token
-- `POST /api/v1/auth/logout` - User logout
+- `POST /api/v1/auth/register` - User registration ✅
+- `POST /api/v1/auth/login` - User login ✅
+- `POST /api/v1/auth/refresh` - Refresh JWT token ✅
+- `POST /api/v1/auth/logout` - User logout ✅
+- `GET /api/v1/auth/oidc/login` - OIDC login ✅
+- `GET /api/v1/auth/oidc/callback` - OIDC callback ✅
 
 #### **Cluster Management**
 - `GET /api/v1/clusters` - List all registered clusters ✅
 - `GET /api/v1/clusters/{id}` - Get cluster details ✅
 - `PUT /api/v1/clusters/{id}` - Update cluster ✅
 - `DELETE /api/v1/clusters/{id}` - Unregister cluster ✅
-- `GET /api/v1/clusters/{id}/resources` - List cluster resources ❌ (Not implemented)
-- `POST /api/v1/clusters/{id}/manifests` - Apply Kubernetes manifests ❌ (Not implemented)
+- `GET /api/v1/clusters/{id}/resources` - List cluster resources 🚧 (Partial)
+- `POST /api/v1/clusters/{id}/manifests` - Apply Kubernetes manifests 🚧 (Partial)
 
 #### **Operations**
 - `GET /api/v1/operations/{id}` - Get operation details ✅
 - `POST /api/v1/operations/{id}/cancel` - Cancel operation ✅
-- `GET /api/v1/operations` - List operations 🚧 (Stub - returns empty)
+- `GET /api/v1/operations` - List operations ✅
+- `GET /api/v1/operations/cluster/{clusterId}` - List operations by cluster ✅
 
 #### **System**
 - `GET /api/v1/health` - Health check ✅
 - `GET /api/v1/metrics` - Prometheus metrics ✅
 
-#### **Authentication** (Middleware exists but not enforced)
-- `POST /api/v1/auth/login` - User login ❌ (Not implemented)
-- `POST /api/v1/auth/refresh` - Refresh JWT token ❌ (Not implemented)
-- `POST /api/v1/auth/logout` - User logout ❌ (Not implemented)
-
 #### **Note**
 - **Cluster Registration**: ✅ Working via gRPC by agents (no HTTP endpoint needed)
-- **Database Operations**: Most repository methods are TODO stubs
+- **Authentication**: All endpoints require proper authentication and authorization
 
 ### Authentication
 
+MCKMT supports multiple authentication methods:
+
+#### **JWT Authentication**
 All API endpoints (except health and metrics) require authentication via JWT token in the Authorization header:
 
 ```bash
@@ -625,49 +754,66 @@ curl -H "Authorization: Bearer <your-jwt-token>" \
      http://localhost:8080/api/v1/clusters
 ```
 
-### Cluster Management
+#### **OIDC Authentication**
+MCKMT supports OIDC authentication with Keycloak:
 
-#### ✅ Working Examples
-
-**List Clusters**
 ```bash
-curl http://localhost:8080/api/v1/clusters
+# Login via OIDC
+curl http://localhost:8080/api/v1/auth/oidc/login
+
+# Callback handling is automatic
 ```
 
-**Get Cluster Details**
+#### **Password Authentication**
+Traditional username/password authentication:
+
 ```bash
-curl http://localhost:8080/api/v1/clusters/{cluster-id}
+# Register user
+curl -X POST http://localhost:8080/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "email": "admin@example.com", "password": "password123"}'
+
+# Login
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "password123"}'
 ```
 
-**Health Check**
+### API Usage Examples
+
+#### **Cluster Management**
+
+**List Clusters** (requires authentication)
+```bash
+curl -H "Authorization: Bearer <token>" http://localhost:8080/api/v1/clusters
+```
+
+**Get Cluster Details** (requires authentication)
+```bash
+curl -H "Authorization: Bearer <token>" http://localhost:8080/api/v1/clusters/{cluster-id}
+```
+
+**Health Check** (no authentication required)
 ```bash
 curl http://localhost:8080/api/v1/health
 ```
 
-**Metrics**
+**Metrics** (no authentication required)
 ```bash
 curl http://localhost:8080/api/v1/metrics
 ```
 
-#### ✅ Working via gRPC
+#### **Operations**
 
-**Cluster Registration** (Agent-driven via gRPC)
+**List Operations** (requires authentication)
 ```bash
-# Agents automatically register with the hub via gRPC
-# No HTTP endpoint needed - this is working and implemented
+curl -H "Authorization: Bearer <token>" http://localhost:8080/api/v1/operations
 ```
 
-#### ❌ Not Yet Working
-
-**Apply Manifests** (Returns "Not implemented yet")
+**Cancel Operation** (requires authentication)
 ```bash
-curl -X POST http://localhost:8080/api/v1/clusters/{cluster-id}/manifests \
-  -F "manifests=@deployment.yaml"
-```
-
-**List Cluster Resources** (Returns "Not implemented yet")
-```bash
-curl http://localhost:8080/api/v1/clusters/{cluster-id}/resources
+curl -X POST -H "Authorization: Bearer <token>" \
+     http://localhost:8080/api/v1/operations/{operation-id}/cancel
 ```
 
 ## Configuration
@@ -677,12 +823,12 @@ The application uses a comprehensive YAML-based configuration system with enviro
 ### Configuration Sources (Priority Order)
 
 1. **Environment variables**: `MCKMT_*` (highest priority)
-2. **Configuration file**: `configs/config.yaml` (default values)
+2. **Configuration file**: `configs/hub_config.yaml` or custom file via `MCKMT_CONFIG_FILE` (overrides defaults)
 3. **Built-in defaults**: Minimal fallback values
 
 ### Configuration File
 
-The main configuration is in `configs/config.yaml`:
+The main configuration is in `configs/hub_config.yaml`:
 
 ```yaml
 # Server Configuration
@@ -747,11 +893,24 @@ logging:
   output_paths: ["stdout"]
   error_output_paths: ["stderr"]
 
-# Metrics Configuration
+# Metrics Configuration (Optional)
 metrics:
-  enabled: true
+  enabled: true  # Set to false to disable metrics collection
   path: "/metrics"
-  port: 9090
+  port: 9091
+```
+
+### Custom Configuration Files
+
+You can use a custom configuration file by setting the `MCKMT_CONFIG_FILE` environment variable:
+
+```bash
+# Use a custom config file
+export MCKMT_CONFIG_FILE=/path/to/your/config.yaml
+./hub
+
+# Or specify inline
+MCKMT_CONFIG_FILE=configs/production.yaml ./hub
 ```
 
 ### Environment Variable Overrides
@@ -776,6 +935,9 @@ export MCKMT_JWT_SECRET=your-production-secret-key
 # Override logging
 export MCKMT_LOGGING_LEVEL=debug
 export MCKMT_LOGGING_FORMAT=console
+
+# Disable metrics collection
+export MCKMT_METRICS_ENABLED=false
 ```
 
 ### Configuration Mapping
@@ -794,8 +956,25 @@ Environment variables map to YAML keys using underscores:
 | `MCKMT_REDIS_HOST` | `redis.host` | Redis host |
 | `MCKMT_REDIS_PORT` | `redis.port` | Redis port |
 | `MCKMT_JWT_SECRET` | `auth.jwt.secret` | JWT signing secret |
+| `MCKMT_JWT_EXPIRATION` | `auth.jwt.expiration` | JWT token expiration |
+| `MCKMT_JWT_ISSUER` | `auth.jwt.issuer` | JWT issuer |
+| `MCKMT_JWT_AUDIENCE` | `auth.jwt.audience` | JWT audience |
+| `MCKMT_AUTH_OIDC_ENABLED` | `auth.oidc.enabled` | Enable OIDC authentication |
+| `MCKMT_AUTH_OIDC_ISSUER` | `auth.oidc.issuer` | OIDC provider issuer URL |
+| `MCKMT_AUTH_OIDC_CLIENT_ID` | `auth.oidc.client_id` | OIDC client ID |
+| `MCKMT_AUTH_OIDC_CLIENT_SECRET` | `auth.oidc.client_secret` | OIDC client secret |
+| `MCKMT_AUTH_OIDC_REDIRECT_URL` | `auth.oidc.redirect_url` | OIDC redirect URL |
+| `MCKMT_AUTH_OIDC_SCOPES` | `auth.oidc.scopes` | OIDC scopes (comma-separated) |
+| `MCKMT_AUTH_PASSWORD_ENABLED` | `auth.password.enabled` | Enable password authentication |
+| `MCKMT_AUTH_PASSWORD_MIN_LENGTH` | `auth.password.min_length` | Minimum password length |
+| `MCKMT_AUTH_RBAC_STRATEGY` | `auth.rbac.strategy` | RBAC strategy (no-auth, database-rbac, casbin) |
+| `MCKMT_AUTH_RBAC_DEFAULT_ROLE` | `auth.rbac.default_role` | Default role for new users |
+| `MCKMT_AUTH_RBAC_CASBIN_ENABLED` | `auth.rbac.casbin.enabled` | Enable Casbin authorization |
+| `MCKMT_AUTH_RBAC_CASBIN_MODEL_FILE` | `auth.rbac.casbin.model_file` | Casbin model file path |
 | `MCKMT_LOGGING_LEVEL` | `logging.level` | Log level (debug, info, warn, error) |
 | `MCKMT_LOGGING_FORMAT` | `logging.format` | Log format (json, console) |
+| `MCKMT_METRICS_ENABLED` | `metrics.enabled` | Enable/disable metrics collection |
+| `MCKMT_METRICS_PORT` | `metrics.port` | Metrics server port |
 
 ## Security
 
@@ -809,7 +988,7 @@ Environment variables map to YAML keys using underscores:
 
 ### Metrics
 
-The application exposes Prometheus metrics at `/api/v1/metrics`:
+The hub application optionally exposes Prometheus metrics at `/api/v1/metrics` (when `metrics.enabled: true`):
 
 - HTTP request metrics
 - Database connection metrics
@@ -905,6 +1084,8 @@ The migration system now uses golang-migrate, a battle-tested migration tool for
 
 ## Development
 
+For detailed examples and tutorials, see our [Examples Documentation](docs/EXAMPLES.md).
+
 ### Project Structure
 
 ```
@@ -929,7 +1110,7 @@ The migration system now uses golang-migrate, a battle-tested migration tool for
 ├── configs/                   # Configuration files (YAML)
 ├── deployments/               # Docker, K8s, Helm deployment manifests
 ├── migrations/                # SQL migrations (golang-migrate format)
-├── scripts/                   # Helper scripts (minikube demo, tests)
+├── scripts/                   # Helper scripts (Kind clusters, tests)
 └── docs/                      # Documentation
 ```
 
@@ -1151,26 +1332,23 @@ resource "mckmt_manifest" "app_deployment" {
 - [x] Log and metrics streaming
 
 ### 🚧 In Progress
-- [ ] Complete repository implementations (currently all TODO stubs)
-- [ ] Agent operation processing logic
-- [ ] Cluster resource management
-- [ ] Manifest application functionality
+- [ ] Complete cluster resource management
+- [ ] Enhanced manifest application functionality
+- [ ] Advanced monitoring and alerting
 
 ### 📋 Next Priority
-- [ ] Complete database repository implementations
-- [ ] Implement cluster resource listing
-- [ ] Implement manifest application
-- [ ] Add authentication enforcement to all endpoints
-- [ ] Complete agent operation processing
+- [ ] Web UI dashboard
+- [ ] Real-time WebSocket notifications
+- [ ] Advanced cluster resource management
+- [ ] Enhanced monitoring dashboards
 
 ### 🔮 Future Features
-- [ ] Web UI dashboard
-- [ ] Advanced RBAC policies
+- [ ] Terraform provider integration
 - [ ] Multi-tenant support
+- [ ] Advanced RBAC policies with custom rules
 - [ ] WebSocket support for real-time updates
 - [ ] Backup and restore functionality
 - [ ] Policy engine integration (OPA)
-- [ ] Terraform provider
 - [ ] Helm chart for easy deployment
 
 ## Support

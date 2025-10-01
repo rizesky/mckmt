@@ -1,24 +1,104 @@
 # MCKMT Examples
 
-This document provides comprehensive examples for using MCKMT with various Kubernetes environments, including minikube, kind, and cloud providers.
+This document provides comprehensive examples for using MCKMT with various Kubernetes environments, including Kind, minikube, and cloud providers.
 
 ## Table of Contents
 
-- [Quick Start with Minikube](#quick-start-with-minikube)
-- [Using with Kind](#using-with-kind)
+- [Quick Start with Kind](#quick-start-with-kind)
+- [Using with Minikube](#using-with-minikube)
 - [Multi-Cluster Setup](#multi-cluster-setup)
 - [Agent Deployment Examples](#agent-deployment-examples)
 - [API Usage Examples](#api-usage-examples)
 - [Troubleshooting](#troubleshooting)
 
-## Quick Start with Minikube
+## Prerequisites
 
-### Prerequisites
-
-- [minikube](https://minikube.sigs.k8s.io/docs/start/) installed
+- [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/) installed (recommended)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/) installed
 - Docker installed
 - Go 1.21+ installed
+
+## Quick Start with Kind
+
+### Step 1: Create Kind Cluster
+
+```bash
+# Use the provided Kind configuration
+kind create cluster --config=configs/kind-single.yaml --name=mckmt-demo
+
+# Verify cluster
+kubectl cluster-info --context kind-mckmt-demo
+```
+
+### Step 2: Start MCKMT Hub
+
+**Option A: Development Mode (Local)**
+```bash
+# Clone the repository
+git clone https://github.com/rizesky/mckmt.git
+cd mckmt
+
+# Install dependencies
+go mod download
+
+# Start dependencies (PostgreSQL, Redis, etc.)
+make deps
+
+# Start the hub API server locally
+go run cmd/hub/main.go
+```
+
+**Option B: Demo Mode (Docker)**
+```bash
+# Start complete demo environment
+make demo-password
+# or for OIDC demo
+make demo-oidc
+```
+
+The hub will be available at:
+- **HTTP API**: http://localhost:8080
+- **gRPC API**: localhost:8081
+- **API Documentation**: http://localhost:8080/swagger/index.html
+
+### Step 3: Deploy the Agent
+
+**Note**: Cluster registration is now handled automatically by the agent via gRPC. No manual registration needed!
+
+### How Automatic Registration Works
+
+1. **Agent starts** and connects to the hub via gRPC
+2. **Agent registers** itself with cluster information (name, labels, etc.)
+3. **Hub assigns** a unique cluster ID
+4. **Agent begins** heartbeat and operation processing
+
+Deploy the agent using Kustomize:
+
+```bash
+# Build agent image
+docker build -t mckmt-agent:latest .
+
+# Load image into kind
+kind load docker-image mckmt-agent:latest --name mckmt-demo
+
+# Deploy agent using Kustomize
+kubectl kustomize deployments/k8s/overlays/demo | kubectl apply -f -
+```
+
+### Step 4: Verify Setup
+
+```bash
+# Check agent is running
+kubectl get pods -l app=mckmt-agent
+
+# Check agent logs
+kubectl logs -l app=mckmt-agent
+
+# Check cluster status via API
+curl http://localhost:8080/api/v1/clusters/mckmt-demo/status
+```
+
+## Using with Minikube
 
 ### Step 1: Start Minikube
 
@@ -32,214 +112,74 @@ kubectl cluster-info
 
 ### Step 2: Start MCKMT Hub
 
+**Option A: Development Mode (Local)**
 ```bash
 # Clone the repository
 git clone https://github.com/rizesky/mckmt.git
 cd mckmt
 
+# Install dependencies
+go mod download
+
 # Start dependencies (PostgreSQL, Redis, etc.)
 make deps
 
-# Start the hub API server
+# Start the hub API server locally
 go run cmd/hub/main.go
 ```
 
-The hub will be available at:
-- **HTTP API**: http://localhost:8080
-- **gRPC API**: localhost:8081
-- **API Documentation**: http://localhost:8080/swagger/index.html
-
-### Step 3: Register the Minikube Cluster
-
+**Option B: Demo Mode (Docker)**
 ```bash
-# Register the minikube cluster with MCKMT
-curl -X POST http://localhost:8080/api/v1/clusters \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "minikube-dev",
-    "mode": "agent",
-    "labels": {
-      "env": "development",
-      "provider": "minikube"
-    }
-  }'
+# Start complete demo environment
+make demo-password
 ```
 
-### Step 4: Deploy the Agent
-
-Create a Kubernetes manifest for the agent:
-
-```yaml
-# agent-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: mckmt-agent
-  namespace: mckmt-system
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: mckmt-agent
-  template:
-    metadata:
-      labels:
-        app: mckmt-agent
-    spec:
-      serviceAccountName: mckmt-agent
-      containers:
-      - name: agent
-        image: mckmt-agent:latest
-        env:
-        - name: MCKMT_HUB_URL
-          value: "host.docker.internal:8081"
-        - name: MCKMT_CLUSTER_ID
-          value: "minikube-dev"
-        - name: MCKMT_AGENT_ID
-          value: "agent-001"
-        resources:
-          requests:
-            memory: "64Mi"
-            cpu: "50m"
-          limits:
-            memory: "128Mi"
-            cpu: "100m"
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: mckmt-agent
-  namespace: mckmt-system
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: mckmt-agent
-rules:
-- apiGroups: [""]
-  resources: ["pods", "services", "configmaps", "secrets"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-- apiGroups: ["apps"]
-  resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-- apiGroups: ["batch"]
-  resources: ["jobs", "cronjobs"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-- apiGroups: [""]
-  resources: ["pods/exec"]
-  verbs: ["create"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: mckmt-agent
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: mckmt-agent
-subjects:
-- kind: ServiceAccount
-  name: mckmt-agent
-  namespace: mckmt-system
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: mckmt-system
-```
-
-Deploy the agent:
-
-```bash
-# Create namespace and deploy agent
-kubectl apply -f agent-deployment.yaml
-
-# Check agent status
-kubectl get pods -n mckmt-system
-kubectl logs -n mckmt-system deployment/mckmt-agent
-```
-
-### Step 5: Verify Connection
-
-```bash
-# Check cluster status
-curl http://localhost:8080/api/v1/clusters
-
-# Check agent heartbeat
-curl http://localhost:8080/api/v1/clusters/minikube-dev/status
-```
-
-## Using with Kind
-
-### Step 1: Create Kind Cluster
-
-```bash
-# Create kind cluster configuration
-cat > kind-config.yaml << EOF
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-nodes:
-- role: control-plane
-  kubeadmConfigPatches:
-  - |
-    kind: InitConfiguration
-    nodeRegistration:
-      kubeletExtraArgs:
-        node-labels: "ingress-ready=true"
-  extraPortMappings:
-  - containerPort: 80
-    hostPort: 80
-    protocol: TCP
-  - containerPort: 443
-    hostPort: 443
-    protocol: TCP
-EOF
-
-# Create the cluster
-kind create cluster --config=kind-config.yaml --name=mckmt-demo
-
-# Verify cluster
-kubectl cluster-info --context kind-mckmt-demo
-```
-
-### Step 2: Deploy MCKMT Hub
-
-```bash
-# Start MCKMT hub
-make deps
-go run cmd/hub/main.go
-```
-
-### Step 3: Register Kind Cluster
-
-```bash
-# Register the kind cluster
-curl -X POST http://localhost:8080/api/v1/clusters \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "kind-demo",
-    "mode": "agent",
-    "labels": {
-      "env": "demo",
-      "provider": "kind"
-    }
-  }'
-```
-
-### Step 4: Deploy Agent to Kind
+### Step 3: Deploy Agent to Minikube
 
 ```bash
 # Build agent image
 docker build -t mckmt-agent:latest .
 
-# Load image into kind
-kind load docker-image mckmt-agent:latest --name mckmt-demo
+# Load image into minikube
+minikube image load mckmt-agent:latest
 
-# Deploy agent (use the same manifest as minikube)
-kubectl apply -f agent-deployment.yaml --context kind-mckmt-demo
+# Deploy agent
+kubectl apply -f deployments/k8s/deployment-agent.yaml
+```
+
+### Step 4: Verify Setup
+
+```bash
+# Check agent is running
+kubectl get pods -l app=mckmt-agent
+
+# Check agent logs
+kubectl logs -l app=mckmt-agent
+
+# Check cluster status via API
+curl http://localhost:8080/api/v1/clusters/minikube-dev/status
 ```
 
 ## Multi-Cluster Setup
+
+### Scenario: Managing Multiple Kind Clusters
+
+```bash
+# Create multiple Kind clusters
+kind create cluster --name cluster1 --config=configs/kind-single.yaml
+kind create cluster --name cluster2 --config=configs/kind-single.yaml
+kind create cluster --name cluster3 --config=configs/kind-single.yaml
+
+# Deploy agents to each cluster
+kubectl config use-context kind-cluster1
+kubectl kustomize deployments/k8s/overlays/demo | kubectl apply -f -
+
+kubectl config use-context kind-cluster2
+kubectl kustomize deployments/k8s/overlays/demo | kubectl apply -f -
+
+kubectl config use-context kind-cluster3
+kubectl kustomize deployments/k8s/overlays/demo | kubectl apply -f -
+```
 
 ### Scenario: Managing Multiple Minikube Clusters
 
@@ -248,222 +188,109 @@ kubectl apply -f agent-deployment.yaml --context kind-mckmt-demo
 minikube start --profile=cluster1 --memory=2048 --cpus=2
 minikube start --profile=cluster2 --memory=2048 --cpus=2
 
-# Register both clusters
-curl -X POST http://localhost:8080/api/v1/clusters \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "cluster1-prod",
-    "mode": "agent",
-    "labels": {
-      "env": "production",
-      "region": "us-west-1"
-    }
-  }'
-
-curl -X POST http://localhost:8080/api/v1/clusters \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "cluster2-staging",
-    "mode": "agent",
-    "labels": {
-      "env": "staging",
-      "region": "us-west-1"
-    }
-  }'
-
 # Deploy agents to both clusters
+# Note: Cluster registration is now handled automatically by the agent via gRPC
 kubectl config use-context minikube-cluster1
-kubectl apply -f agent-deployment.yaml
+kubectl apply -f deployments/k8s/deployment-agent.yaml
 
 kubectl config use-context minikube-cluster2
-kubectl apply -f agent-deployment.yaml
+kubectl apply -f deployments/k8s/deployment-agent.yaml
 ```
 
 ## Agent Deployment Examples
 
-### Docker Compose for Local Development
+### Using Kustomize for Environment-Specific Deployments
 
-```yaml
-# docker-compose.agent.yml
-version: '3.8'
-services:
-  mckmt-agent:
-    build: .
-    command: ["./agent"]
-    environment:
-      - MCKMT_HUB_URL=host.docker.internal:8081
-      - MCKMT_CLUSTER_ID=local-dev
-      - MCKMT_AGENT_ID=agent-local
-    volumes:
-      - ~/.kube/config:/root/.kube/config:ro
-    depends_on:
-      - hub
-    networks:
-      - mckmt-network
+#### Demo Environment
 
-  hub:
-    build: .
-    command: ["./hub"]
-    ports:
-      - "8080:8080"
-      - "8081:8081"
-    environment:
-      - MCKMT_DATABASE_HOST=postgres
-      - MCKMT_REDIS_HOST=redis
-    depends_on:
-      - postgres
-      - redis
-    networks:
-      - mckmt-network
-
-  postgres:
-    image: postgres:15
-    environment:
-      - POSTGRES_DB=mckmt
-      - POSTGRES_USER=mckmt
-      - POSTGRES_PASSWORD=mckmt
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - mckmt-network
-
-  redis:
-    image: redis:7-alpine
-    networks:
-      - mckmt-network
-
-volumes:
-  postgres_data:
-
-networks:
-  mckmt-network:
-    driver: bridge
+```bash
+# Deploy to demo environment
+kubectl kustomize deployments/k8s/overlays/demo | kubectl apply -f -
 ```
 
-### Kubernetes Deployment with ConfigMap
+#### Production Environment
 
-```yaml
-# agent-configmap.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: mckmt-agent-config
-  namespace: mckmt-system
-data:
-  config.yaml: |
-    agent:
-      hub_url: "hub.mckmt.svc.cluster.local:8081"
-      cluster_id: "production-cluster"
-      agent_id: "agent-001"
-      heartbeat_interval: "30s"
-    logging:
-      level: "info"
-      format: "json"
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: mckmt-agent
-  namespace: mckmt-system
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: mckmt-agent
-  template:
-    metadata:
-      labels:
-        app: mckmt-agent
-    spec:
-      serviceAccountName: mckmt-agent
-      containers:
-      - name: agent
-        image: mckmt-agent:latest
-        command: ["./agent"]
-        volumeMounts:
-        - name: config
-          mountPath: /etc/mckmt
-        - name: kubeconfig
-          mountPath: /root/.kube
-          readOnly: true
-        resources:
-          requests:
-            memory: "64Mi"
-            cpu: "50m"
-          limits:
-            memory: "128Mi"
-            cpu: "100m"
-      volumes:
-      - name: config
-        configMap:
-          name: mckmt-agent-config
-      - name: kubeconfig
-        secret:
-          secretName: mckmt-agent-kubeconfig
+```bash
+# Deploy to production environment
+kubectl kustomize deployments/k8s/overlays/production | kubectl apply -f -
+```
+
+### Custom Configuration
+
+You can customize the agent deployment by modifying the Kustomize overlays:
+
+```bash
+# Edit demo configuration
+vim deployments/k8s/overlays/demo/agent-demo-patch.yaml
+
+# Apply changes
+kubectl kustomize deployments/k8s/overlays/demo | kubectl apply -f -
 ```
 
 ## API Usage Examples
 
 ### Cluster Management
 
+#### List All Clusters
+
 ```bash
-# List all clusters
-curl http://localhost:8080/api/v1/clusters
+curl -X GET http://localhost:8080/api/v1/clusters
+```
 
-# Get specific cluster details
-curl http://localhost:8080/api/v1/clusters/{cluster-id}
+#### Get Cluster Details
 
-# Update cluster labels
-curl -X PATCH http://localhost:8080/api/v1/clusters/{cluster-id} \
+```bash
+curl -X GET http://localhost:8080/api/v1/clusters/{cluster-id}
+```
+
+#### Get Cluster Status
+
+```bash
+curl -X GET http://localhost:8080/api/v1/clusters/{cluster-id}/status
+```
+
+### Operation Management
+
+#### List Operations
+
+```bash
+curl -X GET http://localhost:8080/api/v1/operations
+```
+
+#### Get Operation Details
+
+```bash
+curl -X GET http://localhost:8080/api/v1/operations/{operation-id}
+```
+
+#### Cancel Operation
+
+```bash
+curl -X POST http://localhost:8080/api/v1/operations/{operation-id}/cancel
+```
+
+### Authentication
+
+#### Register User
+
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
-    "labels": {
-      "env": "production",
-      "version": "1.2.3"
-    }
+    "username": "admin",
+    "email": "admin@example.com",
+    "password": "password123"
   }'
-
-# Delete cluster
-curl -X DELETE http://localhost:8080/api/v1/clusters/{cluster-id}
 ```
 
-### Deploying Applications
+#### Login
 
 ```bash
-# Deploy a simple nginx deployment
-curl -X POST http://localhost:8080/api/v1/clusters/{cluster-id}/manifests \
-  -H "Content-Type: application/yaml" \
-  --data-binary @nginx-deployment.yaml
-
-# Check operation status
-curl http://localhost:8080/api/v1/operations/{operation-id}
-
-# Get operation logs
-curl http://localhost:8080/api/v1/operations/{operation-id}/logs
-```
-
-### Resource Management
-
-```bash
-# List cluster resources
-curl "http://localhost:8080/api/v1/clusters/{cluster-id}/resources?kind=Deployment"
-
-# Sync cluster state
-curl -X POST http://localhost:8080/api/v1/clusters/{cluster-id}/sync
-
-# Get cluster metrics
-curl http://localhost:8080/api/v1/clusters/{cluster-id}/metrics
-```
-
-### Executing Commands
-
-```bash
-# Execute kubectl command
-curl -X POST http://localhost:8080/api/v1/clusters/{cluster-id}/kubectl/exec \
+curl -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "command": ["kubectl", "get", "pods", "-A"],
-    "timeout": "30s"
+    "username": "admin",
+    "password": "password123"
   }'
 ```
 
@@ -471,33 +298,52 @@ curl -X POST http://localhost:8080/api/v1/clusters/{cluster-id}/kubectl/exec \
 
 ### Common Issues
 
-#### Agent Connection Issues
+#### Agent Not Connecting to Hub
+
+1. **Check network connectivity**:
+   ```bash
+   # From agent pod
+   kubectl exec -it <agent-pod> -- curl http://hub-service:8080/health
+   ```
+
+2. **Verify gRPC connection**:
+   ```bash
+   # Check agent logs
+   kubectl logs -l app=mckmt-agent
+   ```
+
+3. **Check service discovery**:
+   ```bash
+   # Verify DNS resolution
+   kubectl exec -it <agent-pod> -- nslookup hub-service
+   ```
+
+#### Cluster Not Appearing in Hub
+
+1. **Check agent registration**:
+   ```bash
+   # Check agent logs for registration messages
+   kubectl logs -l app=mckmt-agent | grep -i register
+   ```
+
+2. **Verify cluster ID assignment**:
+   ```bash
+   # Check agent environment variables
+   kubectl exec -it <agent-pod> -- env | grep MCKMT
+   ```
+
+#### Kind Cluster Issues
 
 ```bash
-# Check agent logs
-kubectl logs -n mckmt-system deployment/mckmt-agent
+# Reset Kind cluster if needed
+kind delete cluster --name mckmt-demo
+kind create cluster --config=configs/kind-single.yaml --name=mckmt-demo
 
-# Verify network connectivity
-kubectl exec -n mckmt-system deployment/mckmt-agent -- nslookup hub.mckmt.svc.cluster.local
-
-# Check gRPC connectivity
-kubectl exec -n mckmt-system deployment/mckmt-agent -- telnet hub.mckmt.svc.cluster.local 8081
+# Check Kind cluster status
+kind get clusters
 ```
 
-#### Hub API Issues
-
-```bash
-# Check hub logs
-docker logs mckmt-hub
-
-# Verify database connection
-docker exec mckmt-postgres psql -U mckmt -d mckmt -c "SELECT COUNT(*) FROM clusters;"
-
-# Check Redis connection
-docker exec mckmt-redis redis-cli ping
-```
-
-#### Minikube Specific Issues
+#### Minikube Cluster Issues
 
 ```bash
 # Reset minikube if needed
@@ -511,40 +357,103 @@ minikube status
 minikube dashboard
 ```
 
-### Debugging Commands
+### Debug Commands
+
+#### Check All Resources
 
 ```bash
-# Enable debug logging
-export MCKMT_LOGGING_LEVEL=debug
-go run cmd/hub/main.go
+# List all MCKMT resources
+kubectl get all -l app.kubernetes.io/part-of=mckmt
 
-# Check gRPC server status
+# Check namespaces
+kubectl get namespaces | grep mckmt
+```
+
+#### View Logs
+
+```bash
+# Agent logs
+kubectl logs -l app=mckmt-agent
+
+# Hub logs (if running in container)
+docker logs mckmt-hub
+```
+
+#### Test Connectivity
+
+```bash
+# Test HTTP API
+curl http://localhost:8080/health
+
+# Test gRPC (if grpcurl is installed)
 grpcurl -plaintext localhost:8081 list
-
-# Test gRPC connection
-grpcurl -plaintext localhost:8081 agent.AgentService/Register
 ```
 
 ### Performance Tuning
 
-```bash
-# Increase agent resources
-kubectl patch deployment mckmt-agent -n mckmt-system -p '{
-  "spec": {
-    "template": {
-      "spec": {
-        "containers": [{
-          "name": "agent",
-          "resources": {
-            "requests": {"memory": "128Mi", "cpu": "100m"},
-            "limits": {"memory": "256Mi", "cpu": "200m"}
-          }
-        }]
-      }
-    }
-  }
-}'
+#### Resource Limits
 
-# Scale agent horizontally (if supported)
-kubectl scale deployment mckmt-agent -n mckmt-system --replicas=2
+Adjust resource limits in the Kustomize overlays:
+
+```yaml
+# deployments/k8s/overlays/production/agent-production-patch.yaml
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "200m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
 ```
+
+#### Scaling
+
+```bash
+# Scale agent deployment
+kubectl scale deployment mckmt-agent --replicas=3
+
+# Check pod distribution
+kubectl get pods -o wide
+```
+
+## Advanced Examples
+
+### Custom Agent Configuration
+
+Create a custom overlay for your specific needs:
+
+```bash
+# Create custom overlay
+mkdir -p deployments/k8s/overlays/custom
+
+# Copy from demo overlay
+cp -r deployments/k8s/overlays/demo/* deployments/k8s/overlays/custom/
+
+# Modify configuration
+vim deployments/k8s/overlays/custom/agent-demo-patch.yaml
+
+# Deploy custom configuration
+kubectl kustomize deployments/k8s/overlays/custom | kubectl apply -f -
+```
+
+### Integration with CI/CD
+
+```yaml
+# .github/workflows/deploy-agent.yml
+name: Deploy MCKMT Agent
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Deploy to Kind
+        run: |
+          kind create cluster --config=configs/kind-single.yaml
+          kubectl kustomize deployments/k8s/overlays/demo | kubectl apply -f -
+```
+
+This completes the updated examples documentation with Kind prioritized over minikube! 🚀

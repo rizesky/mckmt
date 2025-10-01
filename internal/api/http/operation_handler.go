@@ -4,48 +4,46 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"github.com/rizesky/mckmt/internal/app/operations"
-	"github.com/rizesky/mckmt/internal/auth"
+	"github.com/rizesky/mckmt/internal/operation"
 )
 
 // OperationHandler handles operation-related HTTP requests
 type OperationHandler struct {
-	operationService *operations.OperationService
+	operationService *operation.Service
 	logger           *zap.Logger
-	authMiddleware   *auth.AuthMiddleware
 }
 
 // NewOperationHandler creates a new operation handler
-func NewOperationHandler(operationService *operations.OperationService, logger *zap.Logger) *OperationHandler {
-	// Create JWT manager with default settings
-	jwtManager := auth.NewJWTManager("your-secret-key", 24*time.Hour)
-
+func NewOperationHandler(operationService *operation.Service, logger *zap.Logger) *OperationHandler {
 	return &OperationHandler{
 		operationService: operationService,
 		logger:           logger,
-		authMiddleware:   auth.NewAuthMiddleware(jwtManager, logger),
 	}
 }
 
-// RegisterRoutes registers operation routes
-func (h *OperationHandler) RegisterRoutes(r chi.Router) {
-	r.Route("/operations", func(r chi.Router) {
-		r.Use(h.authMiddleware.RequireAuth)
-		r.Get("/{id}", h.GetOperation)
-		r.Get("/cluster/{clusterId}", h.ListOperationsByCluster)
-		r.Post("/{id}/cancel", h.CancelOperation)
-	})
-}
-
 // GetOperation handles getting a single operation
+// @Summary Get operation by ID
+// @Description Get a specific operation by its ID
+// @Tags operations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Operation ID"
+// @Success 200 {object} OperationDTO
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /operations/{id} [get]
 func (h *OperationHandler) GetOperation(w http.ResponseWriter, r *http.Request) {
+	// Extract ID from URL path using Chi
 	idStr := chi.URLParam(r, "id")
+
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		WriteErrorResponse(w, http.StatusBadRequest, "Invalid operation ID")
@@ -63,8 +61,25 @@ func (h *OperationHandler) GetOperation(w http.ResponseWriter, r *http.Request) 
 }
 
 // ListOperationsByCluster handles listing operations for a cluster
+// @Summary List operations by cluster
+// @Description Get a list of operations for a specific cluster
+// @Tags operations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param clusterId path string true "Cluster ID"
+// @Param status query string false "Operation status filter"
+// @Param limit query int false "Limit number of results"
+// @Param offset query int false "Offset for pagination"
+// @Success 200 {array} OperationDTO
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /operations/cluster/{clusterId} [get]
 func (h *OperationHandler) ListOperationsByCluster(w http.ResponseWriter, r *http.Request) {
+	// Extract cluster ID from URL path using Chi
 	clusterIDStr := chi.URLParam(r, "clusterId")
+
 	clusterID, err := uuid.Parse(clusterIDStr)
 	if err != nil {
 		WriteErrorResponse(w, http.StatusBadRequest, "Invalid cluster ID")
@@ -98,8 +113,23 @@ func (h *OperationHandler) ListOperationsByCluster(w http.ResponseWriter, r *htt
 }
 
 // CancelOperation handles cancelling an operation
+// @Summary Cancel operation
+// @Description Cancel a running operation
+// @Tags operations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Operation ID"
+// @Success 200 {object} SuccessResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /operations/{id}/cancel [post]
 func (h *OperationHandler) CancelOperation(w http.ResponseWriter, r *http.Request) {
+	// Extract ID from URL path using Chi
 	idStr := chi.URLParam(r, "id")
+
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		WriteErrorResponse(w, http.StatusBadRequest, "Invalid operation ID")
@@ -107,7 +137,7 @@ func (h *OperationHandler) CancelOperation(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Parse request body
-	var req operations.CancelOperationRequest
+	var req operation.CancelOperationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		WriteErrorResponse(w, http.StatusBadRequest, "Invalid request body")
 		return
@@ -122,7 +152,7 @@ func (h *OperationHandler) CancelOperation(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Return success response
-	response := operations.CancelOperationResponse{
+	response := operation.CancelOperationResponse{
 		ID:      id,
 		Status:  "cancelled",
 		Message: "Operation cancelled successfully",

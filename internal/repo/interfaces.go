@@ -6,9 +6,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/rizesky/mckmt/internal/user"
 )
 
-//go:generate mockgen -destination=./mocks/mock_repo.go -package=mocks github.com/rizesky/mckmt/internal/repo ClusterRepository,OperationRepository,AuditLogRepository,UserRepository,RoleRepository,Cache,EventBus
+//go:generate mockgen -destination=./mocks/mock_repo.go -package=mocks github.com/rizesky/mckmt/internal/repo ClusterRepository,OperationRepository,AuditLogRepository,UserRepository,RoleRepository,PermissionRepository,Cache,EventBus
 
 // Repository interfaces are defined here because they are shared across multiple services.
 // These interfaces represent the data access layer and are consumed by:
@@ -52,27 +53,62 @@ type AuditLogRepository interface {
 	Create(ctx context.Context, log *AuditLog) error
 	List(ctx context.Context, userID string, limit, offset int) ([]*AuditLog, error)
 	ListByResource(ctx context.Context, resourceType, resourceID string, limit, offset int) ([]*AuditLog, error)
+
+	// Additional audit log methods
+	ListAll(ctx context.Context, limit, offset int) ([]*AuditLog, error)
+	ListByAction(ctx context.Context, action string, limit, offset int) ([]*AuditLog, error)
+	ListByDateRange(ctx context.Context, startDate, endDate time.Time, limit, offset int) ([]*AuditLog, error)
+	Count(ctx context.Context) (int64, error)
+	CountByUser(ctx context.Context, userID string) (int64, error)
 }
 
 // UserRepository defines the interface for user operations
 type UserRepository interface {
-	Create(ctx context.Context, user *User) error
-	GetByID(ctx context.Context, id uuid.UUID) (*User, error)
-	GetByUsername(ctx context.Context, username string) (*User, error)
-	GetByEmail(ctx context.Context, email string) (*User, error)
-	List(ctx context.Context, limit, offset int) ([]*User, error)
-	Update(ctx context.Context, user *User) error
+	Create(ctx context.Context, user *user.User) error
+	GetByID(ctx context.Context, id uuid.UUID) (*user.User, error)
+	GetByUsername(ctx context.Context, username string) (*user.User, error)
+	GetByEmail(ctx context.Context, email string) (*user.User, error)
+	List(ctx context.Context, limit, offset int) ([]*user.User, error)
+	Update(ctx context.Context, user *user.User) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
 // RoleRepository defines the interface for role operations
 type RoleRepository interface {
-	Create(ctx context.Context, role *Role) error
-	GetByID(ctx context.Context, id uuid.UUID) (*Role, error)
-	GetByName(ctx context.Context, name string) (*Role, error)
-	List(ctx context.Context, limit, offset int) ([]*Role, error)
-	Update(ctx context.Context, role *Role) error
+	Create(ctx context.Context, role *user.Role) error
+	GetByID(ctx context.Context, id uuid.UUID) (*user.Role, error)
+	GetByName(ctx context.Context, name string) (*user.Role, error)
+	List(ctx context.Context, limit, offset int) ([]*user.Role, error)
+	Update(ctx context.Context, role *user.Role) error
 	Delete(ctx context.Context, id uuid.UUID) error
+
+	// User-role relationship methods
+	GetUserRoles(ctx context.Context, userID uuid.UUID) ([]*user.Role, error)
+	AssignRoleToUser(ctx context.Context, userID, roleID uuid.UUID, assignedBy *uuid.UUID) error
+	RemoveRoleFromUser(ctx context.Context, userID, roleID uuid.UUID) error
+
+	// Role-permission relationship methods
+	GetRolePermissions(ctx context.Context, roleID uuid.UUID) ([]*user.Permission, error)
+	AssignPermissionToRole(ctx context.Context, roleID, permissionID uuid.UUID, grantedBy *uuid.UUID) error
+	RemovePermissionFromRole(ctx context.Context, roleID, permissionID uuid.UUID) error
+}
+
+// PermissionRepository defines the interface for permission operations
+type PermissionRepository interface {
+	Create(ctx context.Context, permission *user.Permission) error
+	GetByID(ctx context.Context, id uuid.UUID) (*user.Permission, error)
+	GetByName(ctx context.Context, name string) (*user.Permission, error)
+	GetByResourceAction(ctx context.Context, resource, action string) (*user.Permission, error)
+	List(ctx context.Context, limit, offset int) ([]*user.Permission, error)
+	ListByResource(ctx context.Context, resource string) ([]*user.Permission, error)
+	Update(ctx context.Context, permission *user.Permission) error
+	Delete(ctx context.Context, id uuid.UUID) error
+
+	// User permission methods
+	GetUserPermissions(ctx context.Context, userID uuid.UUID) ([]*user.Permission, error)
+	GetUserPermissionsByResource(ctx context.Context, userID uuid.UUID, resource string) ([]*user.Permission, error)
+	CheckUserPermission(ctx context.Context, userID uuid.UUID, resource, action string) (bool, error)
+	CheckUserPermissionExact(ctx context.Context, userID uuid.UUID, resource, action string) (bool, error)
 }
 
 // Cache defines the interface for cache operations
@@ -107,6 +143,7 @@ type Cluster struct {
 	ID                   uuid.UUID  `json:"id" db:"id"`
 	Name                 string     `json:"name" db:"name"`
 	Description          string     `json:"description" db:"description"`
+	Endpoint             string     `json:"endpoint" db:"endpoint"`
 	Labels               Labels     `json:"labels" db:"labels"`
 	EncryptedCredentials []byte     `json:"-" db:"encrypted_credentials"`
 	Status               string     `json:"status" db:"status"`
@@ -131,38 +168,16 @@ type Operation struct {
 
 // AuditLog represents an audit log entity
 type AuditLog struct {
-	ID           uuid.UUID `json:"id" db:"id"`
-	UserID       string    `json:"user_id" db:"user_id"`
-	Action       string    `json:"action" db:"action"`
-	ResourceType string    `json:"resource_type" db:"resource_type"`
-	ResourceID   string    `json:"resource_id" db:"resource_id"`
-	Details      Payload   `json:"details" db:"details"`
-	IPAddress    string    `json:"ip_address" db:"ip_address"`
-	UserAgent    string    `json:"user_agent" db:"user_agent"`
-	CreatedAt    time.Time `json:"created_at" db:"created_at"`
-}
-
-// User represents a user entity
-type User struct {
-	ID        uuid.UUID `json:"id" db:"id"`
-	Username  string    `json:"username" db:"username"`
-	Email     string    `json:"email" db:"email"`
-	Password  string    `json:"-" db:"password"`
-	FirstName string    `json:"first_name" db:"first_name"`
-	LastName  string    `json:"last_name" db:"last_name"`
-	IsActive  bool      `json:"is_active" db:"is_active"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
-}
-
-// Role represents a role entity
-type Role struct {
-	ID          uuid.UUID `json:"id" db:"id"`
-	Name        string    `json:"name" db:"name"`
-	Description string    `json:"description" db:"description"`
-	Permissions []string  `json:"permissions" db:"permissions"`
-	CreatedAt   time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
+	ID              uuid.UUID `json:"id" db:"id"`
+	UserID          string    `json:"user_id" db:"user_id"`
+	Action          string    `json:"action" db:"action"`
+	ResourceType    string    `json:"resource_type" db:"resource_type"`
+	ResourceID      string    `json:"resource_id" db:"resource_id"`
+	RequestPayload  *Payload  `json:"request_payload,omitempty" db:"request_payload"`
+	ResponsePayload *Payload  `json:"response_payload,omitempty" db:"response_payload"`
+	IPAddress       string    `json:"ip_address" db:"ip_address"`
+	UserAgent       string    `json:"user_agent" db:"user_agent"`
+	CreatedAt       time.Time `json:"created_at" db:"created_at"`
 }
 
 // Payload represents a generic payload

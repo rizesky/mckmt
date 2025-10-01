@@ -59,27 +59,6 @@ type AuditLog struct {
 	CreatedAt       time.Time `json:"created_at" db:"created_at"`
 }
 
-// User represents a system user
-type User struct {
-	ID        uuid.UUID `json:"id" db:"id"`
-	Username  string    `json:"username" db:"username"`
-	Email     string    `json:"email" db:"email"`
-	Roles     []string  `json:"roles" db:"roles"`
-	Active    bool      `json:"active" db:"active"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
-}
-
-// Role represents a user role
-type Role struct {
-	ID          uuid.UUID `json:"id" db:"id"`
-	Name        string    `json:"name" db:"name"`
-	Description string    `json:"description" db:"description"`
-	Permissions []string  `json:"permissions" db:"permissions"`
-	CreatedAt   time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
-}
-
 // Labels represents cluster labels as JSONB
 type Labels map[string]string
 

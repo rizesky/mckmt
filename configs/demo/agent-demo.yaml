@@ -1,0 +1,22 @@
+# MCKMT Agent Configuration for Demo Environment
+# This configuration is specific to the demo environment
+
+hub:
+  url: "http://localhost:8080"
+  grpc_port: 9090
+  timeout: "30s"
+  retry_attempts: 3
+  retry_delay: "5s"
+
+heartbeat_interval: "30s"
+operation_timeout: "10m"
+
+logging:
+  level: "info"
+  format: "json"
+  output: "stdout"
+
+metrics:
+  enabled: true
+  path: "/metrics"
+  port: 9092

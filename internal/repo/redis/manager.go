@@ -8,6 +8,8 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
+
+	"github.com/rizesky/mckmt/internal/utils"
 )
 
 // Manager handles Redis cache operations
@@ -112,7 +114,7 @@ func (m *Manager) Ping(ctx context.Context) error {
 
 // Health checks the cache health
 func (m *Manager) Health(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctx, cancel := utils.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	if err := m.client.Ping(ctx).Err(); err != nil {

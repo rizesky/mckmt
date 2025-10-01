@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"github.com/rizesky/mckmt/internal/auth"
 	"github.com/rizesky/mckmt/internal/repo"
 )
 
@@ -19,35 +18,30 @@ import (
 type ClusterHandler struct {
 	clusterService ClusterManager
 	logger         *zap.Logger
-	authMiddleware *auth.AuthMiddleware
 }
 
 // NewClusterHandler creates a new cluster handler
 func NewClusterHandler(clusterService ClusterManager, logger *zap.Logger) *ClusterHandler {
-	// Create JWT manager with default settings
-	jwtManager := auth.NewJWTManager("your-secret-key", 24*time.Hour)
-
 	return &ClusterHandler{
 		clusterService: clusterService,
 		logger:         logger,
-		authMiddleware: auth.NewAuthMiddleware(jwtManager, logger),
 	}
 }
 
-// RegisterRoutes registers cluster routes
-func (h *ClusterHandler) RegisterRoutes(r chi.Router) {
-	r.Route("/clusters", func(r chi.Router) {
-		r.Use(h.authMiddleware.RequireAuth)
-		r.Get("/", h.ListClusters)
-		r.Get("/{id}", h.GetCluster)
-		r.Put("/{id}", h.UpdateCluster)
-		r.Delete("/{id}", h.DeleteCluster)
-		r.Get("/{id}/resources", h.ListClusterResources)
-		r.Post("/{id}/manifests", h.ApplyManifests)
-	})
-}
+// Note: With Go 1.22 enhanced routing, this method is no longer needed
+// as the routing is handled directly in the router using pattern matching.
 
 // ListClusters handles listing clusters
+// @Summary List all clusters
+// @Description Get a list of all registered clusters
+// @Tags clusters
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} ClusterDTO
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /clusters [get]
 func (h *ClusterHandler) ListClusters(w http.ResponseWriter, r *http.Request) {
 	limitStr := r.URL.Query().Get("limit")
 	offsetStr := r.URL.Query().Get("offset")
@@ -97,8 +91,23 @@ func (h *ClusterHandler) ListClusters(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetCluster handles getting a single cluster
+// @Summary Get cluster by ID
+// @Description Get a specific cluster by its ID
+// @Tags clusters
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Cluster ID"
+// @Success 200 {object} ClusterDTO
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /clusters/{id} [get]
 func (h *ClusterHandler) GetCluster(w http.ResponseWriter, r *http.Request) {
+	// Extract ID from URL path using Chi
 	idStr := chi.URLParam(r, "id")
+
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		WriteErrorResponse(w, http.StatusBadRequest, "Invalid cluster ID")
@@ -120,8 +129,24 @@ func (h *ClusterHandler) GetCluster(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateCluster handles updating a cluster
+// @Summary Update cluster
+// @Description Update an existing cluster
+// @Tags clusters
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Cluster ID"
+// @Param cluster body repo.Cluster true "Cluster data"
+// @Success 200 {object} ClusterDTO
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /clusters/{id} [put]
 func (h *ClusterHandler) UpdateCluster(w http.ResponseWriter, r *http.Request) {
+	// Extract ID from URL path using Chi
 	idStr := chi.URLParam(r, "id")
+
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		WriteErrorResponse(w, http.StatusBadRequest, "Invalid cluster ID")
@@ -159,8 +184,23 @@ func (h *ClusterHandler) UpdateCluster(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeleteCluster handles deleting a cluster
+// @Summary Delete cluster
+// @Description Delete a cluster by ID
+// @Tags clusters
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Cluster ID"
+// @Success 200 {object} SuccessResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /clusters/{id} [delete]
 func (h *ClusterHandler) DeleteCluster(w http.ResponseWriter, r *http.Request) {
+	// Extract ID from URL path using Chi
 	idStr := chi.URLParam(r, "id")
+
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		WriteErrorResponse(w, http.StatusBadRequest, "Invalid cluster ID")
@@ -177,8 +217,25 @@ func (h *ClusterHandler) DeleteCluster(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListClusterResources handles listing cluster resources
+// @Summary List cluster resources
+// @Description Get a list of resources in a specific cluster
+// @Tags clusters
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Cluster ID"
+// @Param namespace query string false "Namespace filter"
+// @Param kind query string false "Resource kind filter"
+// @Success 200 {array} map[string]interface{}
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /clusters/{id}/resources [get]
 func (h *ClusterHandler) ListClusterResources(w http.ResponseWriter, r *http.Request) {
+	// Extract ID from URL path using Chi
 	idStr := chi.URLParam(r, "id")
+
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		WriteErrorResponse(w, http.StatusBadRequest, "Invalid cluster ID")
@@ -205,8 +262,24 @@ func (h *ClusterHandler) ListClusterResources(w http.ResponseWriter, r *http.Req
 }
 
 // ApplyManifests handles applying Kubernetes manifests
+// @Summary Apply manifests to cluster
+// @Description Apply Kubernetes manifests to a specific cluster
+// @Tags clusters
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Cluster ID"
+// @Param manifests body map[string]interface{} true "Kubernetes manifests"
+// @Success 200 {object} SuccessResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /clusters/{id}/manifests [post]
 func (h *ClusterHandler) ApplyManifests(w http.ResponseWriter, r *http.Request) {
+	// Extract ID from URL path using Chi
 	idStr := chi.URLParam(r, "id")
+
 	clusterID, err := uuid.Parse(idStr)
 	if err != nil {
 		WriteErrorResponse(w, http.StatusBadRequest, "Invalid cluster ID")

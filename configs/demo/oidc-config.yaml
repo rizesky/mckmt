@@ -1,0 +1,10 @@
+# OIDC Configuration for MCKMT Demo
+# This configuration is specific to the demo environment with Keycloak
+
+oidc:
+  enabled: true
+  issuer: "http://localhost:8082/realms/mckmt"
+  client_id: "mckmt-hub"
+  client_secret: "mckmt-client-secret-123"
+  redirect_url: "http://localhost:8080/auth/oidc/callback"
+  scopes: ["openid", "profile", "email"]

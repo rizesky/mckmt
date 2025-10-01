@@ -8,6 +8,8 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
+
+	"github.com/rizesky/mckmt/internal/utils"
 )
 
 // CacheAdapter adapts Redis client to repo.Cache interface
@@ -73,7 +75,7 @@ func (c *CacheAdapter) Ping(ctx context.Context) error {
 
 // Health checks the cache health
 func (c *CacheAdapter) Health(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctx, cancel := utils.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	if err := c.client.Ping(ctx).Err(); err != nil {

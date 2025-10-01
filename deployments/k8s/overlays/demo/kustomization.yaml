@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: mckmt-demo
+
+resources:
+  - ../../base
+
+patches:
+  - path: agent-demo-patch.yaml
+    target:
+      kind: Deployment
+      name: mckmt-agent
+
+configMapGenerator:
+  - name: mckmt-agent-config
+    literals:
+      - MCKMT_HUB_HOST=host.docker.internal
+      - MCKMT_HUB_PORT=8080
+      - MCKMT_GRPC_PORT=8081
+      - MCKMT_LOGGING_LEVEL=debug
+      - MCKMT_CLUSTER_NAME=mckmt-demo-cluster
+      - MCKMT_AGENT_HEARTBEAT_INTERVAL=30s
+
+labels:
+  - pairs:
+      environment: demo
+      app.kubernetes.io/instance: demo

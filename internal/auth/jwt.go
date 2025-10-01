@@ -41,9 +41,9 @@ func (j *JWTManager) GenerateToken(userID, username, email string, roles []strin
 		Roles:    roles,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        uuid.New().String(),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(j.tokenDuration)),
-			NotBefore: jwt.NewNumericDate(time.Now()),
+			IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+			ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(j.tokenDuration)),
+			NotBefore: jwt.NewNumericDate(time.Now().UTC().Add(-1 * time.Second)), // Allow 1 second clock skew
 		},
 	}
 
@@ -67,11 +67,6 @@ func (j *JWTManager) ValidateToken(tokenString string) (*Claims, error) {
 	claims, ok := token.Claims.(*Claims)
 	if !ok || !token.Valid {
 		return nil, errors.New("invalid token")
-	}
-
-	// Check if token is expired
-	if claims.ExpiresAt != nil && claims.ExpiresAt.Before(time.Now()) {
-		return nil, errors.New("token has expired")
 	}
 
 	return claims, nil

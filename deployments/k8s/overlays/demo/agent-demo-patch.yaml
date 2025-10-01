@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mckmt-agent
+  namespace: mckmt-demo
+spec:
+  template:
+    spec:
+      containers:
+      - name: agent
+        image: mckmt-agent:latest
+        imagePullPolicy: Never
+        envFrom:
+        - configMapRef:
+            name: mckmt-agent-config
+        env:
+        - name: MCKMT_CLUSTER_ID
+          value: "mckmt-demo-cluster"
+        - name: MCKMT_CLUSTER_NAME
+          value: "mckmt-demo-cluster"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"

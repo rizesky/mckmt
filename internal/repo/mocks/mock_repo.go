@@ -16,6 +16,7 @@ import (
 
 	uuid "github.com/google/uuid"
 	repo "github.com/rizesky/mckmt/internal/repo"
+	user "github.com/rizesky/mckmt/internal/user"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -403,17 +404,17 @@ func (m *MockUserRepository) EXPECT() *MockUserRepositoryMockRecorder {
 }
 
 // Create mocks base method.
-func (m *MockUserRepository) Create(ctx context.Context, user *repo.User) error {
+func (m *MockUserRepository) Create(ctx context.Context, arg1 *user.User) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Create", ctx, user)
+	ret := m.ctrl.Call(m, "Create", ctx, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Create indicates an expected call of Create.
-func (mr *MockUserRepositoryMockRecorder) Create(ctx, user any) *gomock.Call {
+func (mr *MockUserRepositoryMockRecorder) Create(ctx, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockUserRepository)(nil).Create), ctx, user)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockUserRepository)(nil).Create), ctx, arg1)
 }
 
 // Delete mocks base method.
@@ -431,10 +432,10 @@ func (mr *MockUserRepositoryMockRecorder) Delete(ctx, id any) *gomock.Call {
 }
 
 // GetByEmail mocks base method.
-func (m *MockUserRepository) GetByEmail(ctx context.Context, email string) (*repo.User, error) {
+func (m *MockUserRepository) GetByEmail(ctx context.Context, email string) (*user.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetByEmail", ctx, email)
-	ret0, _ := ret[0].(*repo.User)
+	ret0, _ := ret[0].(*user.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -446,10 +447,10 @@ func (mr *MockUserRepositoryMockRecorder) GetByEmail(ctx, email any) *gomock.Cal
 }
 
 // GetByID mocks base method.
-func (m *MockUserRepository) GetByID(ctx context.Context, id uuid.UUID) (*repo.User, error) {
+func (m *MockUserRepository) GetByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetByID", ctx, id)
-	ret0, _ := ret[0].(*repo.User)
+	ret0, _ := ret[0].(*user.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -461,10 +462,10 @@ func (mr *MockUserRepositoryMockRecorder) GetByID(ctx, id any) *gomock.Call {
 }
 
 // GetByUsername mocks base method.
-func (m *MockUserRepository) GetByUsername(ctx context.Context, username string) (*repo.User, error) {
+func (m *MockUserRepository) GetByUsername(ctx context.Context, username string) (*user.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetByUsername", ctx, username)
-	ret0, _ := ret[0].(*repo.User)
+	ret0, _ := ret[0].(*user.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -476,10 +477,10 @@ func (mr *MockUserRepositoryMockRecorder) GetByUsername(ctx, username any) *gomo
 }
 
 // List mocks base method.
-func (m *MockUserRepository) List(ctx context.Context, limit, offset int) ([]*repo.User, error) {
+func (m *MockUserRepository) List(ctx context.Context, limit, offset int) ([]*user.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "List", ctx, limit, offset)
-	ret0, _ := ret[0].([]*repo.User)
+	ret0, _ := ret[0].([]*user.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -491,17 +492,17 @@ func (mr *MockUserRepositoryMockRecorder) List(ctx, limit, offset any) *gomock.C
 }
 
 // Update mocks base method.
-func (m *MockUserRepository) Update(ctx context.Context, user *repo.User) error {
+func (m *MockUserRepository) Update(ctx context.Context, arg1 *user.User) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Update", ctx, user)
+	ret := m.ctrl.Call(m, "Update", ctx, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Update indicates an expected call of Update.
-func (mr *MockUserRepositoryMockRecorder) Update(ctx, user any) *gomock.Call {
+func (mr *MockUserRepositoryMockRecorder) Update(ctx, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockUserRepository)(nil).Update), ctx, user)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockUserRepository)(nil).Update), ctx, arg1)
 }
 
 // MockRoleRepository is a mock of RoleRepository interface.
@@ -529,7 +530,7 @@ func (m *MockRoleRepository) EXPECT() *MockRoleRepositoryMockRecorder {
 }
 
 // Create mocks base method.
-func (m *MockRoleRepository) Create(ctx context.Context, role *repo.Role) error {
+func (m *MockRoleRepository) Create(ctx context.Context, role *user.Role) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Create", ctx, role)
 	ret0, _ := ret[0].(error)
@@ -557,10 +558,10 @@ func (mr *MockRoleRepositoryMockRecorder) Delete(ctx, id any) *gomock.Call {
 }
 
 // GetByID mocks base method.
-func (m *MockRoleRepository) GetByID(ctx context.Context, id uuid.UUID) (*repo.Role, error) {
+func (m *MockRoleRepository) GetByID(ctx context.Context, id uuid.UUID) (*user.Role, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetByID", ctx, id)
-	ret0, _ := ret[0].(*repo.Role)
+	ret0, _ := ret[0].(*user.Role)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -572,10 +573,10 @@ func (mr *MockRoleRepositoryMockRecorder) GetByID(ctx, id any) *gomock.Call {
 }
 
 // GetByName mocks base method.
-func (m *MockRoleRepository) GetByName(ctx context.Context, name string) (*repo.Role, error) {
+func (m *MockRoleRepository) GetByName(ctx context.Context, name string) (*user.Role, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetByName", ctx, name)
-	ret0, _ := ret[0].(*repo.Role)
+	ret0, _ := ret[0].(*user.Role)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -587,10 +588,10 @@ func (mr *MockRoleRepositoryMockRecorder) GetByName(ctx, name any) *gomock.Call 
 }
 
 // List mocks base method.
-func (m *MockRoleRepository) List(ctx context.Context, limit, offset int) ([]*repo.Role, error) {
+func (m *MockRoleRepository) List(ctx context.Context, limit, offset int) ([]*user.Role, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "List", ctx, limit, offset)
-	ret0, _ := ret[0].([]*repo.Role)
+	ret0, _ := ret[0].([]*user.Role)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -602,7 +603,7 @@ func (mr *MockRoleRepositoryMockRecorder) List(ctx, limit, offset any) *gomock.C
 }
 
 // Update mocks base method.
-func (m *MockRoleRepository) Update(ctx context.Context, role *repo.Role) error {
+func (m *MockRoleRepository) Update(ctx context.Context, role *user.Role) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Update", ctx, role)
 	ret0, _ := ret[0].(error)

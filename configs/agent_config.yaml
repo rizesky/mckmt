@@ -1,0 +1,19 @@
+# MCKMT Agent Configuration File
+# This file contains agent-specific configuration values
+# Environment variables with MCKMT_ prefix will override these values
+
+hub_url: "localhost:8081"
+token: ""
+heartbeat_interval: "30s"
+reconnect_wait: "5s"
+operation_timeout: "5m"
+max_retries: 3
+retry_backoff: "1s"
+
+logging:
+  level: "info"
+  format: "json"
+  caller: false
+  stacktrace: false
+  output_paths: ["stdout"]
+  error_output_paths: ["stderr"]

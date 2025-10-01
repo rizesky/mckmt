@@ -118,12 +118,6 @@ type OperationResponse struct {
 	UpdatedAt  time.Time              `json:"updated_at"`
 }
 
-// ErrorResponse represents an error response
-type ErrorResponse struct {
-	Error     string `json:"error"`
-	RequestID string `json:"request_id,omitempty"`
-}
-
 // ValidationError represents a validation error
 type ValidationError struct {
 	Field   string `json:"field"`

@@ -1,0 +1,98 @@
+# MCKMT Hub Configuration File
+# This file contains hub-specific configuration values
+# Environment variables with MCKMT_ prefix will override these values
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  read_timeout: "30s"
+  write_timeout: "30s"
+  idle_timeout: "120s"
+  tls:
+    enabled: false
+    cert_file: ""
+    key_file: ""
+
+grpc:
+  host: "0.0.0.0"
+  port: 8081
+  read_timeout: "30s"
+  write_timeout: "30s"
+  idle_timeout: "120s"
+  tls:
+    enabled: false
+    cert_file: ""
+    key_file: ""
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "mckmt"
+  password: "mckmt"
+  database: "mckmt"
+  ssl_mode: "disable"
+  max_conns: 25
+  min_conns: 5
+  max_conn_life: "1h"
+  max_conn_idle: "30m"
+
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+
+auth:
+  # OIDC Authentication (Enterprise SSO)
+  oidc:
+    enabled: false  # Set to true to enable OIDC
+    issuer: "http://localhost:8080/realms/mckmt"  # Keycloak example
+    client_id: "mckmt-hub"
+    client_secret: "your-oidc-client-secret"
+    redirect_url: "http://localhost:8080/api/v1/auth/oidc/callback"
+    scopes: ["openid", "profile", "email", "groups"]
+  
+  # JWT Configuration (for both OIDC and password auth)
+  jwt:
+    secret: "your-super-secret-jwt-key-change-in-production"
+    expiration: "24h"
+    issuer: "mckmt"
+    audience: "mckmt-users"
+  
+  # Role-Based Access Control
+  rbac:
+    strategy: "casbin"  # Options: "no-auth", "database-rbac", "casbin"
+    default_role: "viewer"
+    
+    # Casbin Authorization Engine (only used when strategy is "casbin")
+    casbin:
+      enabled: true  # Enable Casbin for advanced authorization features
+      model_file: "configs/casbin-model.conf"  # Casbin model file (uses built-in model if empty)
+      policy_file: ""  # Optional: custom policy file path (uses database if empty)
+      auto_reload: false  # Auto-reload policies when database changes
+      reload_interval: 60  # Reload interval in seconds (when auto_reload is true)
+  
+  # Password Authentication (always enabled for development/testing)
+  password:
+    enabled: true
+    min_length: 8
+    require_uppercase: true
+    require_lowercase: true
+    require_numbers: true
+    require_special_chars: true
+
+orchestrator:
+  workers: 5
+
+logging:
+  level: "info"
+  format: "json"
+  caller: false
+  stacktrace: false
+  output_paths: ["stdout"]
+  error_output_paths: ["stderr"]
+
+metrics:
+  enabled: true
+  path: "/metrics"
+  port: 9091

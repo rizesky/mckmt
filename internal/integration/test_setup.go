@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/rizesky/mckmt/internal/app/clusters"
+	"github.com/rizesky/mckmt/internal/cluster"
 	"github.com/rizesky/mckmt/internal/config"
 	"github.com/rizesky/mckmt/internal/orchestrator"
 	"github.com/rizesky/mckmt/internal/repo"
@@ -18,7 +18,7 @@ import (
 // TestSuite holds all the components needed for integration tests
 type TestSuite struct {
 	// Configuration
-	Config *config.Config
+	Config *config.HubConfig
 
 	// Repositories
 	ClusterRepo   repo.ClusterRepository
@@ -26,7 +26,7 @@ type TestSuite struct {
 	Cache         repo.Cache
 
 	// Services
-	ClusterService *clusters.ClusterService
+	ClusterService *cluster.Service
 	Orchestrator   *orchestrator.Orchestrator
 
 	// Metrics
@@ -67,7 +67,7 @@ func SetupTestSuite(t *testing.T) *TestSuite {
 	orchestrator := orchestrator.NewOrchestrator(operationRepo, metricsManager, logger, 2)
 
 	// Create cluster service
-	clusterService := clusters.NewClusterService(
+	clusterService := cluster.NewService(
 		clusterRepo,
 		operationRepo,
 		cache,
@@ -110,9 +110,9 @@ func SetupTestSuite(t *testing.T) *TestSuite {
 }
 
 // loadTestConfig loads test configuration
-func loadTestConfig() *config.Config {
+func loadTestConfig() *config.HubConfig {
 	// Return default test config
-	return &config.Config{
+	return &config.HubConfig{
 		Server: config.ServerConfig{
 			Host: "localhost",
 			Port: 8080,
@@ -141,10 +141,14 @@ func loadTestConfig() *config.Config {
 func createTestLogger(t *testing.T) *zap.Logger {
 	t.Helper()
 
-	config := zap.NewDevelopmentConfig()
-	config.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
+	cfg := config.LoggingConfig{
+		Level:      "info",
+		Format:     "console",
+		Caller:     false,
+		Stacktrace: false,
+	}
 
-	logger, err := config.Build()
+	logger, err := config.InitLogger(cfg)
 	if err != nil {
 		t.Fatalf("Failed to create logger: %v", err)
 	}

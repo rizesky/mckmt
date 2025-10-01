@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/rizesky/mckmt/internal/repo"
+	"github.com/rizesky/mckmt/internal/utils"
 )
 
 // operationRepository implements repo.OperationRepository interface
@@ -28,10 +29,10 @@ func (r *operationRepository) Create(ctx context.Context, operation *repo.Operat
 
 	payloadJSON, err := json.Marshal(operation.Payload)
 	if err != nil {
-		return fmt.Errorf("failed to marshal payload: %w", err)
+		return utils.ErrMarshal("payload", err)
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	_, err = r.db.pool.Exec(ctx, query,
 		operation.ID,
 		operation.ClusterID,
@@ -43,7 +44,7 @@ func (r *operationRepository) Create(ctx context.Context, operation *repo.Operat
 	)
 
 	if err != nil {
-		return fmt.Errorf("failed to create operation: %w", err)
+		return utils.ErrCreate("operation", err)
 	}
 
 	return nil
@@ -108,7 +109,7 @@ func (r *operationRepository) ListByCluster(ctx context.Context, clusterID uuid.
 	}
 	defer rows.Close()
 
-	var operations []*repo.Operation
+	operations := make([]*repo.Operation, 0)
 	for rows.Next() {
 		var operation repo.Operation
 		var payloadJSON, resultJSON string
@@ -175,7 +176,7 @@ func (r *operationRepository) Update(ctx context.Context, operation *repo.Operat
 		resultJSON = &resultStr
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	_, err = r.db.pool.Exec(ctx, query,
 		operation.ID,
 		operation.Status,
@@ -280,7 +281,7 @@ func (r *operationRepository) CancelOperation(ctx context.Context, id uuid.UUID,
 	resultPayload := map[string]interface{}{
 		"cancelled":    true,
 		"reason":       reason,
-		"cancelled_at": time.Now(),
+		"cancelled_at": time.Now().UTC(),
 	}
 
 	resultJSON, err := json.Marshal(resultPayload)

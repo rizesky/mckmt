@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment-agent.yaml
+  - service-agent.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: mckmt-agent
+      app.kubernetes.io/part-of: mckmt
+
+images:
+  - name: mckmt-agent
+    newTag: latest

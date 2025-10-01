@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 )
 
@@ -37,8 +38,6 @@ func (h *SystemHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 
 // Metrics handles metrics endpoint
 func (h *SystemHandler) Metrics(w http.ResponseWriter, r *http.Request) {
-	// This would return Prometheus metrics
-	WriteJSONResponse(w, http.StatusOK, map[string]interface{}{
-		"message": "Metrics endpoint - implement Prometheus metrics here",
-	})
+	// Serve Prometheus metrics
+	promhttp.Handler().ServeHTTP(w, r)
 }

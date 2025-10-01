@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mckmt-agent
+  namespace: mckmt-system
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+      - name: agent
+        image: mckmt-agent:v1.0.0
+        imagePullPolicy: IfNotPresent
+        envFrom:
+        - configMapRef:
+            name: mckmt-agent-config
+        env:
+        - name: MCKMT_CLUSTER_ID
+          value: "mckmt-production-cluster"
+        - name: MCKMT_CLUSTER_NAME
+          value: "mckmt-production-cluster"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5

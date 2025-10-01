@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mckmt-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mckmt-agent
+  namespace: mckmt-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mckmt-agent
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps", "secrets", "nodes"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["pods/exec"]
+  verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mckmt-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mckmt-agent
+subjects:
+- kind: ServiceAccount
+  name: mckmt-agent
+  namespace: mckmt-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mckmt-agent
+  namespace: mckmt-system
+  labels:
+    app: mckmt-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mckmt-agent
+  template:
+    metadata:
+      labels:
+        app: mckmt-agent
+    spec:
+      serviceAccountName: mckmt-agent
+      containers:
+      - name: agent
+        image: mckmt-agent:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+            # Override only what's different from agent.yaml defaults
+            - name: MCKMT_HUB_URL
+              value: "host.docker.internal:8081"
+            - name: MCKMT_LOGGING_LEVEL
+              value: "debug"
+            - name: MCKMT_CONFIG_FILE
+              value: "/app/configs/agent.yaml"
+        volumeMounts:
+        - name: kubeconfig
+          mountPath: /root/.kube
+          readOnly: true
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: kubeconfig
+        hostPath:
+          path: /root/.kube
+          type: Directory
